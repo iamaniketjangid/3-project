@@ -1,0 +1,47 @@
+name: Deploy 3 Apps
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & Push Frontend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/app1-frontend:latest ./app1-frontend
+          docker push ${{ secrets.DOCKER_USERNAME }}/app1-frontend:latest
+
+      - name: Build & Push Backend
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/app2-backend:latest ./app2-backend
+          docker push ${{ secrets.DOCKER_USERNAME }}/app2-backend:latest
+
+      - name: Build & Push Mongo-Express
+        run: |
+          docker build -t ${{ secrets.DOCKER_USERNAME }}/app3-db:latest ./app3-db
+          docker push ${{ secrets.DOCKER_USERNAME }}/app3-db:latest
+
+      - name: Deploy to Minikube
+        run: |
+          minikube start --driver=docker
+          kubectl apply -f kafka/kafka.yaml
+          helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+          helm repo update
+          helm install prometheus prometheus-community/prometheus
+          kubectl apply -f k8s/apps/   # if you have K8s YAML for frontend/backend
